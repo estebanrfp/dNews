@@ -36,8 +36,8 @@ const visitor = async (browser, room) => {
   await expect(page.locator("#bigbox")).toContainText(/Nothing here yet|point/)
   return { page, context }
 }
-const loginAs = async (page, name) => {
-  await page.goto(url(new URLSearchParams(page.url().split("?")[1]).get("room"), "#/login"))
+const loginAs = async (page, room, name) => {
+  await page.goto(url(room, "#/login"))
   await page.locator(`.demo-login:has-text("${name}")`).click()
   await expect(page.locator("#session")).toContainText(name)
 }
@@ -47,7 +47,7 @@ test("a newcomer is promoted by the constitution, submits, and the authority's v
   const room = freshRoom("story")
   const authority = await visitor(browser, room)
   const alice = await visitor(browser, room)
-  await loginAs(alice.page, "alice")
+  await loginAs(alice.page, room, "alice")
   await connected(alice.page)
 
   // A guest, and no authority online to promote her: the site says so instead
@@ -60,7 +60,7 @@ test("a newcomer is promoted by the constitution, submits, and the authority's v
   await expect(alice.page).toHaveURL(/#\/submit/)
 
   // The authority arrives: the rule fires on its device and the signed role reaches Alice.
-  await loginAs(authority.page, "constitution")
+  await loginAs(authority.page, room, "constitution")
   await connected(authority.page)
   await alice.page.goto(url(room, `#/user/${ALICE}`))
   await expect(alice.page.locator(".userpage")).toContainText(/role:\s*user/)
@@ -105,8 +105,8 @@ test("writing is free, influence is earned: an unvouched identity's vote weighs 
   const authority = await visitor(browser, room)
   const alice = await visitor(browser, room)
   const newcomer = await visitor(browser, room)
-  await loginAs(authority.page, "constitution")
-  await loginAs(alice.page, "alice")
+  await loginAs(authority.page, room, "constitution")
+  await loginAs(alice.page, room, "alice")
   // A brand-new identity: generate, then sign in with the phrase it shows.
   await newcomer.page.goto(url(room, "#/login"))
   await newcomer.page.locator("#generate-btn").click()
