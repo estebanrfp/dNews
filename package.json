@@ -1,0 +1,15 @@
+{
+  "name": "dnews",
+  "private": true,
+  "type": "module",
+  "description": "dNews — a Hacker News clone with no server, built with GenosDB",
+  "author": "Esteban Fuster Pozzi <estebanrfp@gmail.com> (https://github.com/estebanrfp)",
+  "license": "MIT",
+  "scripts": {
+    "serve": "bun tests/server.mjs",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}
