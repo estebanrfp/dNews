@@ -167,11 +167,15 @@ const storyList = (list, d, page, base) => {
   return `<table>${slice.map((n, i) => storyRow(n, start + i + 1, d)).join("")}${more}</table>`
 }
 
-const commentRow = (n, depth, d, collapsed) => {
+// `context` is HN's comment lists (threads, newcomments): each comment says
+// which story it is on, and parent when it is a reply.
+const commentRow = (n, depth, d, collapsed, context = false) => {
   const dead = d.dead(n.id), mine = d.myVote(n.id)?.value.dir ?? 0, kids = d.descendants(n.id)
+  const story = nodes.get(n.value.story), parent = n.value.parent !== n.value.story ? `<a href="#/item/${n.value.parent}">parent</a> | ` : ""
+  const on = context ? ` | ${parent}<a href="#/item/${n.value.story}">context</a> | on: <a href="#/item/${n.value.story}">${esc(story?.value.title ?? "a story")}</a>` : ""
   return `<tr class="athing comtr${collapsed.has(n.id) ? " collapsed" : ""}${dead ? " dead" : ""}" id="c-${n.id}"><td><table><tr>
 <td class="ind" data-depth="${depth}" style="--depth:${depth};width:${depth * 40}px"></td>${voteCell(n, d, dead)}
-<td class="default"><div class="comhead">${userLink(n.value.owner, d)} <a href="#/item/${n.id}">${ago(n.value.at)}</a>${mine ? ` | <a href="#" class="vote" data-item="${n.id}" data-dir="0">unvote</a>` : ""}${dead ? ` | <span class="label">[dead: ${esc(d.deadReason(n.id))}]</span>` : ""} | <a href="#" class="flag" data-item="${n.id}">${d.myFlag(n.id)?.value.on ? "unflag" : "flag"}</a> <a href="#" class="togg" data-item="${n.id}">[${collapsed.has(n.id) ? `${kids + 1} more` : "–"}]</a></div>
+<td class="default"><div class="comhead">${userLink(n.value.owner, d)} <a href="#/item/${n.id}">${ago(n.value.at)}</a>${mine ? ` | <a href="#" class="vote" data-item="${n.id}" data-dir="0">unvote</a>` : ""}${dead ? ` | <span class="label">[dead: ${esc(d.deadReason(n.id))}]</span>` : ""} | <a href="#" class="flag" data-item="${n.id}">${d.myFlag(n.id)?.value.on ? "unflag" : "flag"}</a>${on} <a href="#" class="togg" data-item="${n.id}">[${collapsed.has(n.id) ? `${kids + 1} more` : "–"}]</a></div>
 <div class="comment"><div class="commtext">${richText(n.value.text)}</div><div class="reply"><a href="#" class="reply-link" data-item="${n.id}">reply</a></div><div id="reply-${n.id}"></div></div></td></tr></table></td></tr>`
 }
 const commentTree = (parent, depth, d, collapsed, out = []) => {
@@ -304,13 +308,13 @@ const render = async () => {
     case "show": html = `<table><tr><td class="title">Show dN is for something you've made that other people can play with. Start the title with "Show dN:".</td></tr></table><br>` + storyList(d.stories.filter((n) => isShow(n) && visible(n)).sort(byRank), d, r.p, "#/show"); title = `Show | ${SITE}`; break
     case "jobs": html = storyList(d.stories.filter((n) => isJob(n) && visible(n)).sort(byTime), d, r.p, "#/jobs") + `<table><tr><td class="subtext">A job is a story whose title says who is hiring. Nobody pays to be here; nobody can be paid to be here.</td></tr></table>`; title = `Jobs | ${SITE}`; break
     case "hidden": html = storyList(d.stories.filter((n) => hiddenSet().has(n.id)).sort(byTime), d, r.p, "#/hidden"); title = `Hidden | ${SITE}`; break
-    case "newcomments": html = `<table class="comment-tree">${d.comments.filter((n) => !d.dead(n.id) || showDead()).sort((a, b) => b.value.at - a.value.at).slice(0, T.perPage).map((n) => commentRow(n, 0, d, new Set())).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; title = `New Comments | ${SITE}`; break
+    case "newcomments": html = `<table class="comment-tree">${d.comments.filter((n) => !d.dead(n.id) || showDead()).sort((a, b) => b.value.at - a.value.at).slice(0, T.perPage).map((n) => commentRow(n, 0, d, new Set(), true)).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; title = `New Comments | ${SITE}`; break
     case "item": html = itemPage(r.arg, d); title = `${nodes.get(r.arg)?.value.title ?? "Item"} | ${SITE}`; break
     case "submit": html = submitPage(); title = `Submit | ${SITE}`; break
     case "login": html = loginPage(); title = `Login | ${SITE}`; break
     case "user": html = r.arg ? userPage(r.arg, d) : ""; title = `Profile: ${nameOf(r.arg, d)} | ${SITE}`; break
     case "submitted": html = storyList(d.stories.filter((n) => eqAddr(n.value.owner, r.arg)).sort((a, b) => b.value.at - a.value.at), d, r.p, `#/submitted/${r.arg}`); break
-    case "threads": html = `<table class="comment-tree">${d.comments.filter((n) => eqAddr(n.value.owner, r.arg ?? me)).sort((a, b) => b.value.at - a.value.at).map((n) => commentRow(n, 0, d, new Set())).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; break
+    case "threads": html = `<table class="comment-tree">${d.comments.filter((n) => eqAddr(n.value.owner, r.arg ?? me)).sort((a, b) => b.value.at - a.value.at).map((n) => commentRow(n, 0, d, new Set(), true)).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; title = `${nameOf(r.arg ?? me, d)}'s comments | ${SITE}`; break
     case "from": html = storyList(d.stories.filter((n) => domainOf(n.value.url) === r.arg).sort((a, b) => b.value.at - a.value.at), d, r.p, `#/from/${r.arg}`); break
     case "search": { // the engine's $text: accent-insensitive, one field
       const { results } = await db.map({ query: { type: "story", title: { $text: r.q } } })

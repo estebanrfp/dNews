@@ -98,6 +98,9 @@ test("a newcomer is promoted by the constitution, submits, and the authority's v
   await alice.page.locator('.reply-form input[type="submit"]').click()
   await expect(alice.page.locator(".comment-tree .commtext")).toContainText("a node the voter owns")
   await expect(authority.page.locator(".subtext")).toContainText("1 comment")
+  await alice.page.goto(url(room, "#/threads")) // HN's threads: my comments, each saying which story it is on
+  await expect(alice.page.locator("#nav a.topsel")).toHaveText("threads")
+  await expect(alice.page.locator(".comment-tree .comhead")).toContainText("on: GenosDB: a P2P graph database")
 
   const stats = await transportStats(alice.page)
   console.log("alice transport:", JSON.stringify(stats))
