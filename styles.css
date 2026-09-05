@@ -27,8 +27,8 @@ td { font: 10pt var(--font); color: var(--grey); }
 /* The one table, 85% wide and centred, as on HN. */
 #hnmain { width: 85%; min-width: 796px; margin: 0 auto; border-collapse: collapse; background: var(--page); }
 #hnmain > tbody > tr > td { padding: 0; }
-.topbar { background: var(--orange); padding: 2px; }
-.topbar table { width: 100%; border-collapse: collapse; }
+.topbar { background: var(--orange); }
+.topbar table { width: 100%; border-collapse: collapse; padding: 2px; } /* HN pads the inner table, not the cell: 2 + 20 + 2 = 24px */
 .topbar td { padding: 0; }
 .logo { width: 18px; padding-right: 4px !important; }
 /* y18.svg is an 18px square with a 1px white border outside it: 20px in
