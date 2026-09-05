@@ -2,7 +2,7 @@
 
 A Hacker News clone with **no server**. The same front page, the same threads, the same orange bar — but every story, comment, vote and flag is a signed node in a [GenosDB](https://github.com/estebanrfp/gdb) graph that lives in your browser and syncs peer-to-peer over WebRTC. Nobody hosts it, nobody moderates it: a **constitution every peer runs** decides who may write, what a vote weighs, and when an item dies — and it is a file in this repository.
 
-**Live:** [estebanrfp.github.io/dnews](https://estebanrfp.github.io/dNews/) · **Engine:** [GenosDB](https://github.com/estebanrfp/gdb) — if this is interesting, [star the engine ★](https://github.com/estebanrfp/gdb): that is where the work is.
+**Live:** [estebanrfp.github.io/dNews](https://estebanrfp.github.io/dNews/) · **Engine:** [GenosDB](https://github.com/estebanrfp/gdb) — if this is interesting, [star the engine ★](https://github.com/estebanrfp/gdb): that is where the work is.
 
 Plain HTML, CSS and JavaScript. No framework, no build step, no backend. Four files.
 
