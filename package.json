@@ -10,6 +10,7 @@
     "test": "playwright test"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.1"
+    "@playwright/test": "1.62.1",
+    "genosdb": "0.33.5"
   }
 }

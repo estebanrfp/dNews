@@ -59,12 +59,14 @@ pnpm install
 pnpm test
 ```
 
-Playwright, one `BrowserContext` per simulated visitor (own storage, own identity), a fresh room per test, real WebRTC between them. Four files:
+Playwright, one `BrowserContext` per simulated visitor (own storage, own identity), a fresh room per test, real WebRTC between them. Twenty-four tests in six files:
 
 - `tests/pages.spec.js` — every page of the bar with its own content, `past` by day, search, `More`, `hide`, folding a thread, a phone viewport, the shell when the CDN is unreachable.
 - `tests/identity.spec.js` — generate, sign in, sign out, recover with the phrase; a wrong phrase; a passkey that keeps the session across a reload (on Playwright's virtual authenticator); a profile.
 - `tests/constitution.spec.js` — the rules as the engine applies them: a guest's write refused by every receiver, another's node that nobody can edit (the authority included), a vote that weighs nothing until someone vouches, your own vote that never counts, three trusted flags that kill an item and `showdead` that reveals it, the ladder that restricts at −10 karma and restores. Every negative is proved against a later write that does land, never against silence.
 - `tests/sync.spec.js` — a story and a thread crossing between visitors with the ICE candidate pairs to prove the transport, and a device that comes back to its graph on disk with no peer online.
+- `tests/thresholds.spec.js` — the thresholds reached by real votes: five downvotes that kill an item on their own (`deadScore`), a voucher that pays for an invitee who ends up restricted (`vouchPenalty`), and a downvote below `downvoteKarma` that is neither offered nor counted.
+- `tests/server.spec.js` — the Fallback Server (the always-on peer in the `genosdb` package, a dev dependency here) as the authority: it promotes with no browser authority online and keeps the graph when every browser is gone.
 
 Signalling goes through the public relays; set `DNEWS_RELAY=ws://…` to use a local one, which makes discovery immediate.
 
