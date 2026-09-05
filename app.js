@@ -147,6 +147,7 @@ const storyRow = (n, i, d) => {
   if (mine) meta.push(`<a href="#" class="vote" data-item="${n.id}" data-dir="0">un${mine > 0 ? "vote" : "downvote"}</a>`)
   else if (me && (d.upKarma.get(me.toLowerCase()) ?? 0) >= T.downvoteKarma && !dead) meta.push(`<a href="#" class="vote" data-item="${n.id}" data-dir="-1">downvote</a>`)
   meta.push(`<a href="#" class="flag" data-item="${n.id}">${flagged ? "unflag" : "flag"}</a>`)
+  meta.push(`<a href="#" class="hide" data-item="${n.id}">${hiddenSet().has(n.id) ? "un-hide" : "hide"}</a>`)
   if (dead) meta.push(`<span class="label">${esc(d.deadReason(n.id))}</span>`)
   meta.push(`<a href="#/item/${n.id}">${c ? plural(c, "comment") : "discuss"}</a>`)
   return `<tr class="athing${dead ? " dead" : ""}" id="s-${n.id}"><td class="title rank">${i ? `${i}.` : ""}</td>${voteCell(n, d, dead)}<td class="title"><span class="titleline${dead ? " dead" : ""}"><a href="${n.value.url && validUrl(n.value.url) ? esc(n.value.url) : `#/item/${n.id}`}"${n.value.url ? ' rel="nofollow noopener"' : ""}>${esc(title)}</a>${domain ? ` <span class="sitebit">(<a href="#/from/${esc(domain)}">${esc(domain)}</a>)</span>` : ""}</span></td></tr>
@@ -256,9 +257,23 @@ ${mine}</div>`
 const route = () => {
   const [path, query = ""] = location.hash.slice(1).split("?")
   const seg = path.split("/").filter(Boolean)
-  return { page: seg[0] ?? "", arg: seg[1] ? decodeURIComponent(seg[1]) : null, p: Number(new URLSearchParams(query).get("p")) || 1, q: new URLSearchParams(query).get("q") ?? "" }
+  const qs = new URLSearchParams(query)
+  return { page: seg[0] ?? "", arg: seg[1] ? decodeURIComponent(seg[1]) : null, p: Number(qs.get("p")) || 1, q: qs.get("q") ?? "", day: qs.get("day") ?? dayOf(Date.now() - 86_400_000) }
 }
 const showDead = () => localStorage.dnewsShowDead === "1"
+const hiddenSet = () => new Set(JSON.parse(localStorage.dnewsHidden ?? "[]")) // hide is local, as HN's is per account
+const isAsk = (n) => !n.value.url
+const isShow = (n) => /^show dn\b/i.test(n.value.title)
+const isJob = (n) => /\bhiring\b/i.test(n.value.title)
+const dayOf = (at) => { const d = new Date(at); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` }
+const shiftDay = (day, days = 0, months = 0, years = 0) => { const d = new Date(`${day}T12:00:00`); d.setFullYear(d.getFullYear() + years, d.getMonth() + months, d.getDate() + days); return dayOf(d.getTime()) }
+const front = (day, d) => { // HN's "past": the day's stories, ranked by points, with the same navigation
+  const list = d.stories.filter((n) => dayOf(n.value.at) === day && (!d.dead(n.id) || showDead())).sort((a, b) => (d.points.get(b.id) ?? 0) - (d.points.get(a.id) ?? 0) || a.value.at - b.value.at)
+  const link = (label, dd, mm, yy) => `<a href="#/front?day=${shiftDay(day, dd, mm, yy)}">${label}</a>`
+  const nav = `<table><tr><td class="title">Stories from ${new Date(`${day}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} (UTC${new Date().getTimezoneOffset() ? ", by this browser's clock" : ""})</td></tr>
+<tr><td class="subtext">Go back ${link("a day", -1)}, ${link("month", 0, -1)}, or ${link("year", 0, 0, -1)}. Go forward ${link("a day", 1)}, ${link("month", 0, 1)}, or ${link("year", 0, 0, 1)}.</td></tr></table><br>`
+  return nav + (list.length ? `<table>${list.map((n, i) => storyRow(n, i + 1, d)).join("")}</table>` : `<table><tr><td class="title">No stories that day.</td></tr></table>`)
+}
 const collapsedSet = () => new Set(JSON.parse(sessionStorage.dnewsCollapsed ?? "[]"))
 let renderQueued = false, dirtyWhileTyping = false
 const scheduleRender = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render() }) }
@@ -268,18 +283,26 @@ const typing = () => document.hasFocus() && $("bigbox").contains(document.active
 const render = async () => {
   if (typing()) { dirtyWhileTyping = true; return } // never repaint under the reader's caret
   const d = derive(), r = route()
-  document.querySelectorAll("[data-nav]").forEach((a) => a.classList.toggle("topsel", a.dataset.nav === r.page))
+  const hidden = hiddenSet()
+  const visible = (n) => (!d.dead(n.id) || showDead()) && !hidden.has(n.id)
+  const byRank = (a, b) => d.rank(b) - d.rank(a), byTime = (a, b) => b.value.at - a.value.at
+  renderNav(r.page)
   let html, title = "dNews"
   switch (r.page) {
-    case "": case "news": html = storyList(d.stories.filter((n) => !d.dead(n.id) || showDead()).sort((a, b) => d.rank(b) - d.rank(a)), d, r.p, "#/news"); break
-    case "newest": html = storyList(d.stories.filter((n) => !d.dead(n.id) || showDead()).sort((a, b) => b.value.at - a.value.at), d, r.p, "#/newest"); title = "New Links | dNews"; break
+    case "": case "news": html = storyList(d.stories.filter(visible).sort(byRank), d, r.p, "#/news"); break
+    case "newest": html = storyList(d.stories.filter(visible).sort(byTime), d, r.p, "#/newest"); title = "New Links | dNews"; break
+    case "front": html = front(r.day, d); title = `Stories from ${r.day} | dNews`; break
+    case "ask": html = storyList(d.stories.filter((n) => isAsk(n) && visible(n)).sort(byRank), d, r.p, "#/ask"); title = "Ask | dNews"; break
+    case "show": html = `<table><tr><td class="title">Show dN is for something you've made that other people can play with. Start the title with "Show dN:".</td></tr></table><br>` + storyList(d.stories.filter((n) => isShow(n) && visible(n)).sort(byRank), d, r.p, "#/show"); title = "Show | dNews"; break
+    case "jobs": html = storyList(d.stories.filter((n) => isJob(n) && visible(n)).sort(byTime), d, r.p, "#/jobs") + `<table><tr><td class="subtext">A job is a story whose title says who is hiring. Nobody pays to be here; nobody can be paid to be here.</td></tr></table>`; title = "Jobs | dNews"; break
+    case "hidden": html = storyList(d.stories.filter((n) => hiddenSet().has(n.id)).sort(byTime), d, r.p, "#/hidden"); title = "Hidden | dNews"; break
     case "newcomments": html = `<table class="comment-tree">${d.comments.filter((n) => !d.dead(n.id) || showDead()).sort((a, b) => b.value.at - a.value.at).slice(0, T.perPage).map((n) => commentRow(n, 0, d, new Set())).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; title = "New Comments | dNews"; break
     case "item": html = itemPage(r.arg, d); title = `${nodes.get(r.arg)?.value.title ?? "Item"} | dNews`; break
     case "submit": html = submitPage(); title = "Submit | dNews"; break
     case "login": html = loginPage(); title = "Login | dNews"; break
     case "user": html = r.arg ? userPage(r.arg, d) : ""; title = `Profile: ${nameOf(r.arg, d)} | dNews`; break
     case "submitted": html = storyList(d.stories.filter((n) => eqAddr(n.value.owner, r.arg)).sort((a, b) => b.value.at - a.value.at), d, r.p, `#/submitted/${r.arg}`); break
-    case "threads": html = `<table class="comment-tree">${d.comments.filter((n) => eqAddr(n.value.owner, r.arg)).sort((a, b) => b.value.at - a.value.at).map((n) => commentRow(n, 0, d, new Set())).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; break
+    case "threads": html = `<table class="comment-tree">${d.comments.filter((n) => eqAddr(n.value.owner, r.arg ?? me)).sort((a, b) => b.value.at - a.value.at).map((n) => commentRow(n, 0, d, new Set())).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; break
     case "from": html = storyList(d.stories.filter((n) => domainOf(n.value.url) === r.arg).sort((a, b) => b.value.at - a.value.at), d, r.p, `#/from/${r.arg}`); break
     case "search": { // the engine's $text: accent-insensitive, one field
       const { results } = await db.map({ query: { type: "story", title: { $text: r.q } } })
@@ -290,6 +313,11 @@ const render = async () => {
   $("bigbox").innerHTML = html
   document.title = title
   renderSession(d)
+}
+// HN's bar, item for item; `threads` only with a session, as on HN.
+const renderNav = (page) => {
+  const items = [["newest", "new"], ...(me ? [["threads", "threads"]] : []), ["front", "past"], ["newcomments", "comments"], ["ask", "ask"], ["show", "show"], ["jobs", "jobs"], ["submit", "submit"]]
+  $("nav").innerHTML = `<b><a href="#/">dNews</a></b>` + items.map(([r, label]) => `<a href="#/${r}" data-nav="${r}"${(page || "news") === r ? ' class="topsel"' : ""}>${label}</a>`).join(" | ")
 }
 const renderSession = (d) => {
   $("session").innerHTML = me
@@ -329,6 +357,10 @@ document.addEventListener("click", async (e) => {
   const d = derive()
   if (a.classList.contains("vote")) { e.preventDefault(); return setVote(a.dataset.item, Number(a.dataset.dir), d) }
   if (a.classList.contains("flag")) { e.preventDefault(); return setFlag(a.dataset.item, d) }
+  if (a.classList.contains("hide")) {
+    e.preventDefault(); const h = hiddenSet(); h.has(a.dataset.item) ? h.delete(a.dataset.item) : h.add(a.dataset.item)
+    localStorage.dnewsHidden = JSON.stringify([...h]); return render()
+  }
   if (a.classList.contains("togg")) {
     e.preventDefault(); const c = collapsedSet(); c.has(a.dataset.item) ? c.delete(a.dataset.item) : c.add(a.dataset.item)
     sessionStorage.dnewsCollapsed = JSON.stringify([...c]); return render()
