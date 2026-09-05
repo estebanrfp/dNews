@@ -236,7 +236,7 @@ const userPage = (addr, d) => {
     ["user:", `<span class="hnuser">${esc(nameOf(addr, d))}</span>`],
     ["address:", `<span class="mono">${esc(addr)}</span>`],
     ["created:", since ? new Date(since).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "—"],
-    ["karma:", `${k}${certified !== undefined && certified !== k ? ` <span class="label">(the authority last certified ${certified})</span>` : ""}`],
+    ["karma:", `${k}${certified !== undefined ? ` <span class="label${certified !== k ? " mismatch" : ""}">— counted here from the signed votes; the authority certified ${certified}${certified !== k ? ", which differs" : ""}</span>` : ""}`],
     ["role:", `${esc(role)}${role === "restricted" ? " — lost the right to write; it comes back with the karma" : ""}`],
     ["trust:", trusted ? (eqAddr(addr, AUTHORITY) ? "the authority" : `vouched for by ${userLink(voucher, d)}`) : "not vouched for yet — posts count, votes and flags do not"],
     ...(invitees.length ? [["vouched:", invitees.map((a) => userLink(a, d)).join(", ")]] : []),
