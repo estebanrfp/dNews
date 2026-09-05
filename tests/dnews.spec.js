@@ -48,7 +48,7 @@ test("a newcomer is promoted by the constitution, submits, and the authority's v
   const authority = await visitor(browser, room)
   const alice = await visitor(browser, room)
   await loginAs(alice.page, room, "alice")
-  await expect(alice.page.locator("#nav")).toHaveText("dNewsnew | threads | past | comments | ask | show | jobs | submit") // HN's bar, item for item
+  await expect(alice.page.locator("#nav")).toHaveText("Hacker Newsnew | threads | past | comments | ask | show | jobs | submit") // HN's bar, item for item
   await connected(alice.page)
 
   // A guest, and no authority online to promote her: the site says so instead

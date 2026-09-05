@@ -10,6 +10,7 @@
 // other browser runs. Nobody moderates; everybody calculates.
 import { CONSTITUTION, DEMO_IDENTITIES, SUPERADMIN, ALICE, BOB, governanceRules } from "./constitution.js"
 
+const SITE = "Hacker News" // the brand on the bar and in titles; the app and the repo are dNews
 const T = CONSTITUTION.thresholds
 const AUTHORITY = CONSTITUTION.authority.toLowerCase()
 const $ = (id) => document.getElementById(id)
@@ -295,27 +296,27 @@ const render = async () => {
   const visible = (n) => (!d.dead(n.id) || showDead()) && !hidden.has(n.id)
   const byRank = (a, b) => d.rank(b) - d.rank(a), byTime = (a, b) => b.value.at - a.value.at
   renderNav(r.page)
-  let html, title = "dNews"
+  let html, title = SITE
   switch (r.page) {
     case "": case "news": html = storyList(d.stories.filter(visible).sort(byRank), d, r.p, "#/news"); break
-    case "newest": html = storyList(d.stories.filter(visible).sort(byTime), d, r.p, "#/newest"); title = "New Links | dNews"; break
-    case "front": html = front(r.day, d); title = `Stories from ${r.day} | dNews`; break
-    case "ask": html = storyList(d.stories.filter((n) => isAsk(n) && visible(n)).sort(byRank), d, r.p, "#/ask"); title = "Ask | dNews"; break
-    case "show": html = `<table><tr><td class="title">Show dN is for something you've made that other people can play with. Start the title with "Show dN:".</td></tr></table><br>` + storyList(d.stories.filter((n) => isShow(n) && visible(n)).sort(byRank), d, r.p, "#/show"); title = "Show | dNews"; break
-    case "jobs": html = storyList(d.stories.filter((n) => isJob(n) && visible(n)).sort(byTime), d, r.p, "#/jobs") + `<table><tr><td class="subtext">A job is a story whose title says who is hiring. Nobody pays to be here; nobody can be paid to be here.</td></tr></table>`; title = "Jobs | dNews"; break
-    case "hidden": html = storyList(d.stories.filter((n) => hiddenSet().has(n.id)).sort(byTime), d, r.p, "#/hidden"); title = "Hidden | dNews"; break
-    case "newcomments": html = `<table class="comment-tree">${d.comments.filter((n) => !d.dead(n.id) || showDead()).sort((a, b) => b.value.at - a.value.at).slice(0, T.perPage).map((n) => commentRow(n, 0, d, new Set())).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; title = "New Comments | dNews"; break
-    case "item": html = itemPage(r.arg, d); title = `${nodes.get(r.arg)?.value.title ?? "Item"} | dNews`; break
-    case "submit": html = submitPage(); title = "Submit | dNews"; break
-    case "login": html = loginPage(); title = "Login | dNews"; break
-    case "user": html = r.arg ? userPage(r.arg, d) : ""; title = `Profile: ${nameOf(r.arg, d)} | dNews`; break
+    case "newest": html = storyList(d.stories.filter(visible).sort(byTime), d, r.p, "#/newest"); title = `New Links | ${SITE}`; break
+    case "front": html = front(r.day, d); title = `Stories from ${r.day} | ${SITE}`; break
+    case "ask": html = storyList(d.stories.filter((n) => isAsk(n) && visible(n)).sort(byRank), d, r.p, "#/ask"); title = `Ask | ${SITE}`; break
+    case "show": html = `<table><tr><td class="title">Show dN is for something you've made that other people can play with. Start the title with "Show dN:".</td></tr></table><br>` + storyList(d.stories.filter((n) => isShow(n) && visible(n)).sort(byRank), d, r.p, "#/show"); title = `Show | ${SITE}`; break
+    case "jobs": html = storyList(d.stories.filter((n) => isJob(n) && visible(n)).sort(byTime), d, r.p, "#/jobs") + `<table><tr><td class="subtext">A job is a story whose title says who is hiring. Nobody pays to be here; nobody can be paid to be here.</td></tr></table>`; title = `Jobs | ${SITE}`; break
+    case "hidden": html = storyList(d.stories.filter((n) => hiddenSet().has(n.id)).sort(byTime), d, r.p, "#/hidden"); title = `Hidden | ${SITE}`; break
+    case "newcomments": html = `<table class="comment-tree">${d.comments.filter((n) => !d.dead(n.id) || showDead()).sort((a, b) => b.value.at - a.value.at).slice(0, T.perPage).map((n) => commentRow(n, 0, d, new Set())).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; title = `New Comments | ${SITE}`; break
+    case "item": html = itemPage(r.arg, d); title = `${nodes.get(r.arg)?.value.title ?? "Item"} | ${SITE}`; break
+    case "submit": html = submitPage(); title = `Submit | ${SITE}`; break
+    case "login": html = loginPage(); title = `Login | ${SITE}`; break
+    case "user": html = r.arg ? userPage(r.arg, d) : ""; title = `Profile: ${nameOf(r.arg, d)} | ${SITE}`; break
     case "submitted": html = storyList(d.stories.filter((n) => eqAddr(n.value.owner, r.arg)).sort((a, b) => b.value.at - a.value.at), d, r.p, `#/submitted/${r.arg}`); break
     case "threads": html = `<table class="comment-tree">${d.comments.filter((n) => eqAddr(n.value.owner, r.arg ?? me)).sort((a, b) => b.value.at - a.value.at).map((n) => commentRow(n, 0, d, new Set())).join("") || `<tr><td class="title">No comments yet.</td></tr>`}</table>`; break
     case "from": html = storyList(d.stories.filter((n) => domainOf(n.value.url) === r.arg).sort((a, b) => b.value.at - a.value.at), d, r.p, `#/from/${r.arg}`); break
     case "search": { // the engine's $text: accent-insensitive, one field
       const { results } = await db.map({ query: { type: "story", title: { $text: r.q } } })
-      html = storyList(results.map((n) => nodes.get(n.id) ?? n).sort((a, b) => b.value.at - a.value.at), d, r.p, `#/search?q=${encodeURIComponent(r.q)}&`); title = `Search: ${r.q} | dNews`; break }
-    case "constitution": html = constitutionPage(d); title = "Constitution | dNews"; break
+      html = storyList(results.map((n) => nodes.get(n.id) ?? n).sort((a, b) => b.value.at - a.value.at), d, r.p, `#/search?q=${encodeURIComponent(r.q)}&`); title = `Search: ${r.q} | ${SITE}`; break }
+    case "constitution": html = constitutionPage(d); title = `Constitution | ${SITE}`; break
     default: html = `<table><tr><td class="title">No such page.</td></tr></table>`
   }
   $("bigbox").innerHTML = html
@@ -325,7 +326,7 @@ const render = async () => {
 // HN's bar, item for item; `threads` only with a session, as on HN.
 const renderNav = (page) => {
   const items = [["newest", "new"], ...(me ? [["threads", "threads"]] : []), ["front", "past"], ["newcomments", "comments"], ["ask", "ask"], ["show", "show"], ["jobs", "jobs"], ["submit", "submit"]]
-  $("nav").innerHTML = `<b><a href="#/">dNews</a></b>` + items.map(([r, label]) => `<a href="#/${r}" data-nav="${r}"${(page || "news") === r ? ' class="topsel"' : ""}>${label}</a>`).join(" | ")
+  $("nav").innerHTML = `<b><a href="#/">${SITE}</a></b>` + items.map(([r, label]) => `<a href="#/${r}" data-nav="${r}"${(page || "news") === r ? ' class="topsel"' : ""}>${label}</a>`).join(" | ")
 }
 const renderSession = (d) => {
   $("session").innerHTML = me
