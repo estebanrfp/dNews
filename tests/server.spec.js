@@ -4,7 +4,7 @@
  * and keeps the graph when every browser is gone.
  */
 import { spawn } from "node:child_process"
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -26,11 +26,14 @@ const fetchServer = async () => {
 test("the Fallback Server is the authority that never sleeps: it promotes with no browser authority online, and keeps the graph when every browser is gone", async ({ browser }) => {
   test.setTimeout(300_000)
   const room = freshRoom("server")
+  const dataDir = mkdtempSync(join(tmpdir(), "dnews-srv-"))
   const server = spawn("bun", [await fetchServer(), room, "--room"], {
     cwd: ROOT,
-    env: { ...process.env, GDB_DB_PATH: join(mkdtempSync(join(tmpdir(), "dnews-srv-")), "data.sqlite"), GDB_SM_KEY: SUPERADMIN.mnemonic, GDB_SUPERADMINS: CONSTITUTION.authority, GDB_SM_RULES: JSON.stringify(governanceRules), ...(RELAY && { GDB_RELAY_URLS: RELAY }) },
+    env: { ...process.env, GDB_DB_PATH: join(dataDir, "data.sqlite"), GDB_SM_KEY: SUPERADMIN.mnemonic, GDB_SUPERADMINS: CONSTITUTION.authority, GDB_SM_RULES: JSON.stringify(governanceRules), ...(RELAY && { GDB_RELAY_URLS: RELAY }) },
     stdio: ["ignore", "pipe", "pipe"],
   })
+  // What the server holds is on its disk: the SQLite files (main + WAL) grow when a node lands.
+  const onDisk = () => readdirSync(dataDir).reduce((n, f) => n + statSync(join(dataDir, f)).size, 0)
   let log = ""
   server.stdout.on("data", (d) => { log += d }); server.stderr.on("data", (d) => { log += d })
   try {
@@ -39,8 +42,10 @@ test("the Fallback Server is the authority that never sleeps: it promotes with n
     await loginAs(alice, "alice")
     await connected(alice) // the server joined the room: it is the peer
     await promoted(alice) // by the rules, signed on the server — no browser authority anywhere
+    const before = onDisk()
     await submit(alice, "Kept by the server", "https://genosdb.com/")
     await expect(alice.page.locator(".titleline")).toContainText("Kept by the server")
+    await expect.poll(onDisk, { timeout: 90_000 }).toBeGreaterThan(before) // the server wrote it down
     await alice.close() // every browser is gone
 
     const later = await visitor(browser, room) // a fresh device: the only holder left is the server
@@ -51,5 +56,6 @@ test("the Fallback Server is the authority that never sleeps: it promotes with n
     await later.close()
   } finally {
     server.kill()
+    if (test.info().status !== test.info().expectedStatus) console.log("server log:\n" + log.slice(-3000))
   }
 })
