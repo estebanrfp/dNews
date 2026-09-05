@@ -3,7 +3,10 @@
  * other a newcomer. Every peer is its own BrowserContext; every test its own
  * room. The assertions are what a reader sees — never the app's internals.
  */
-import { expect, test } from "@playwright/test"
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { chromium, expect, test } from "@playwright/test"
 
 const RELAY = process.env.DNEWS_RELAY
 const ALICE = "0x3546D4BA0ac3bfDea3F1511F82a078DDdb3F4931"
@@ -148,4 +151,35 @@ test("writing is free, influence is earned: an unvouched identity's vote weighs 
   await newcomer.page.goto(url(room, `#/user/${newcomerAddr}`))
   await expect(newcomer.page.locator(".userpage")).toContainText(/vouched for by\s*constitution/)
   await authority.context.close(); await alice.context.close(); await newcomer.context.close()
+})
+
+test("a device that comes back finds its graph on disk and renders before any peer", async () => {
+  // Not a fresh context: a user-data dir that survives close and relaunch, OPFS
+  // included. The regression this guards: db.map hands a returning device its
+  // nodes synchronously, before the module has finished declaring itself.
+  const room = freshRoom("device")
+  const device = mkdtempSync(join(tmpdir(), "dnews-device-"))
+  let context = await chromium.launchPersistentContext(device)
+  let page = context.pages()[0] ?? (await context.newPage())
+  page.on("pageerror", (e) => { throw e })
+  await page.goto(`http://localhost:5705${url(room)}`)
+  await expect(page.locator("#bigbox")).toContainText("Nothing here yet")
+  await loginAs(page, room, "constitution")
+  await page.goto(`http://localhost:5705${url(room, "#/submit")}`)
+  await page.locator('[name="title"]').fill("Written on this device, read back from its disk")
+  await page.locator('[name="text"]').fill("No peer was ever online.")
+  await page.locator('#submit-form input[type="submit"]').click()
+  await expect(page).toHaveURL(/#\/item\//)
+  await expect(page.locator(".titleline")).toContainText("Written on this device")
+  await context.close()
+
+  context = await chromium.launchPersistentContext(device)
+  page = context.pages()[0] ?? (await context.newPage())
+  const errors = []
+  page.on("pageerror", (e) => errors.push(e.message))
+  await page.goto(`http://localhost:5705${url(room)}`)
+  await expect(page.locator(".titleline")).toContainText("Written on this device")
+  await expect(page.locator("#nav")).toContainText("submit")
+  expect(errors).toEqual([])
+  await context.close()
 })

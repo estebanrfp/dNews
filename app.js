@@ -43,13 +43,9 @@ const db = await boot("open the graph on this device", () => gdb(ROOM, {
 
 // ── The store: one subscription, every kind of node ─────────────────────────
 // The four actions land here and nowhere else; every view derives from it.
+// The subscription itself is made at the end of the file: a device that
+// already holds the graph gets its nodes synchronously, inside db.map.
 const nodes = new Map()
-await db.map({ query: { $or: [{ type: { $in: ["story", "comment", "vote", "flag", "vouch"] } }, { role: { $exists: true } }] } },
-  ({ id, value, timestamp, action }) => {
-    if (action === "removed") nodes.delete(id)
-    else nodes.set(id, { id, value, timestamp })
-    scheduleRender()
-  })
 
 // ── Derivation: the constitution, applied by this peer ──────────────────────
 // Everything below is a pure function of the store. Trust is a chain of
@@ -462,6 +458,14 @@ db.sm.setSecurityStateChangeCallback((state) => {
   if (eqAddr(me, AUTHORITY)) startAuthority(); else stopAuthority()
   render()
 })
+
+// ── The subscription: after everything it may call, for a returning device ──
+await db.map({ query: { $or: [{ type: { $in: ["story", "comment", "vote", "flag", "vouch"] } }, { role: { $exists: true } }] } },
+  ({ id, value, timestamp, action }) => {
+    if (action === "removed") nodes.delete(id)
+    else nodes.set(id, { id, value, timestamp })
+    scheduleRender()
+  })
 
 // ── Presence, in the footer, as on every GenosDB page ───────────────────────
 const presence = () => { const n = Object.keys(db.room?.getPeers() ?? {}).length; $("presence").textContent = `${n} peer${n === 1 ? "" : "s"}` }
