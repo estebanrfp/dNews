@@ -8,13 +8,23 @@
 // points, karma, trust, ranking, dead items — is derived by this browser from
 // those signed nodes with the rules of constitution.js, the same rules every
 // other browser runs. Nobody moderates; everybody calculates.
-import { gdb } from "https://cdn.jsdelivr.net/npm/genosdb@latest/dist/index.min.js"
 import { CONSTITUTION, DEMO_IDENTITIES, SUPERADMIN, ALICE, BOB, governanceRules } from "./constitution.js"
 
 const T = CONSTITUTION.thresholds
 const AUTHORITY = CONSTITUTION.authority.toLowerCase()
 const $ = (id) => document.getElementById(id)
 const eqAddr = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase()
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
+let me = null, session = {}
+
+// The shell — HN's bar, a loading line — is in index.html and shows before a
+// byte of the engine arrives. What follows can be slow (a CDN, the relays)
+// or fail (a network that blocks the CDN), and either must be visible.
+const boot = async (step, fn) => {
+  try { return await fn() }
+  catch (err) { $("bigbox").innerHTML = `<table><tr><td class="title">Could not ${step}: ${esc(err.message)}</td></tr><tr><td class="subtext">Reload to try again. The site needs cdn.jsdelivr.net for the engine and the public relays to meet peers.</td></tr></table>`; throw err }
+}
+const { gdb } = await boot("load the GenosDB engine from cdn.jsdelivr.net", () => import("https://cdn.jsdelivr.net/npm/genosdb@latest/dist/index.min.js"))
 
 // `?room=` opens a private sandbox of the same site (the tests use it, so can
 // you); `?relay=` points signalling at a relay of your own.
@@ -25,15 +35,14 @@ const PASSKEYS_AVAILABLE = window.isSecureContext && !!window.PublicKeyCredentia
   !/^\d{1,3}(\.\d{1,3}){3}$/.test(location.hostname) // an IP is never an RP ID
 
 // ── Boot: the constitution travels beside the root of trust ─────────────────
-const db = await gdb(ROOM, {
+const db = await boot("open the graph on this device", () => gdb(ROOM, {
   rtc: RELAY ? { relayUrls: [RELAY] } : true,
   sm: { superAdmins: [CONSTITUTION.authority], customRoles: CONSTITUTION.roles, governanceRules, acls: true },
-})
+}))
 
 // ── The store: one subscription, every kind of node ─────────────────────────
 // The four actions land here and nowhere else; every view derives from it.
 const nodes = new Map()
-let me = null, session = {}
 await db.map({ query: { $or: [{ type: { $in: ["story", "comment", "vote", "flag", "vouch"] } }, { role: { $exists: true } }] } },
   ({ id, value, timestamp, action }) => {
     if (action === "removed") nodes.delete(id)
@@ -115,7 +124,6 @@ const derive = () => {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
 const abbr = (a) => a ? `${a.slice(0, 6)}…${a.slice(-4)}` : ""
 const DEMO_NAMES = Object.fromEntries(DEMO_IDENTITIES.map((i) => [i.address.toLowerCase(), i.name]))
 const userNodeId = (addr) => { for (const id of nodes.keys()) if (id.startsWith("user:") && eqAddr(id.slice(5), addr)) return id; return null }
