@@ -4,7 +4,7 @@
  * and keeps the graph when every browser is gone.
  */
 import { spawn } from "node:child_process"
-import { mkdtempSync } from "node:fs"
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -12,11 +12,21 @@ import { CONSTITUTION, SUPERADMIN, governanceRules } from "../constitution.js"
 import { RELAY, connected, freshRoom, go, loginAs, promoted, submit, visitor } from "./_helpers.js"
 
 const ROOT = new URL("..", import.meta.url).pathname
+const ARTIFACT = "https://cdn.jsdelivr.net/npm/genosdb@latest/dist/genossrv.min.js" // one file, zero dependencies, same CDN as the app
+
+/** The server is an artifact, fetched from the CDN like the engine the app runs — nothing installed. */
+const fetchServer = async () => {
+  const dir = join(ROOT, "node_modules", ".cache"); mkdirSync(dir, { recursive: true })
+  const file = join(dir, "genossrv.min.js")
+  const res = await fetch(ARTIFACT); if (!res.ok) throw new Error(`${ARTIFACT} → ${res.status}`)
+  writeFileSync(file, Buffer.from(await res.arrayBuffer()))
+  return file
+}
 
 test("the Fallback Server is the authority that never sleeps: it promotes with no browser authority online, and keeps the graph when every browser is gone", async ({ browser }) => {
   test.setTimeout(300_000)
   const room = freshRoom("server")
-  const server = spawn("bun", ["node_modules/genosdb/dist/genossrv.min.js", room, "--room"], {
+  const server = spawn("bun", [await fetchServer(), room, "--room"], {
     cwd: ROOT,
     env: { ...process.env, GDB_DB_PATH: join(mkdtempSync(join(tmpdir(), "dnews-srv-")), "data.sqlite"), GDB_SM_KEY: SUPERADMIN.mnemonic, GDB_SUPERADMINS: CONSTITUTION.authority, GDB_SM_RULES: JSON.stringify(governanceRules), ...(RELAY && { GDB_RELAY_URLS: RELAY }) },
     stdio: ["ignore", "pipe", "pipe"],
