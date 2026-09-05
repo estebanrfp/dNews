@@ -40,7 +40,7 @@ td { font: 10pt var(--font); color: var(--grey); }
 .pagetop { font: 10pt/12px var(--font); color: #222222; }
 .pagetop a:link, .pagetop a:visited { color: #000000; }
 .pagetop b { margin-left: 1px; margin-right: 5px; }
-.topsel a:link, .topsel a:visited { color: #ffffff; }
+a.topsel:link, a.topsel:visited { color: #ffffff; } /* the section you are on, as on HN */
 .pagetop .karma { color: #000000; }
 .session { text-align: right; padding-right: 4px !important; white-space: nowrap; }
 .notice { padding: 8px 10px 0; color: #000000; }

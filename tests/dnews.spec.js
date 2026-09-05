@@ -76,6 +76,8 @@ test("a newcomer is promoted by the constitution, submits, and the authority's v
   await alice.page.locator('[name="url"]').fill("https://github.com/estebanrfp/gdb")
   await alice.page.locator('input[type="submit"]').click()
   await expect(alice.page).toHaveURL(/#\/newest/)
+  await expect(alice.page.locator("#nav a.topsel")).toHaveText("new") // the section you are on, in white, as on HN
+  expect(await alice.page.locator("#nav a.topsel").evaluate((a) => getComputedStyle(a).color)).toBe("rgb(255, 255, 255)")
   await expect(alice.page.locator(".titleline")).toContainText("GenosDB: a P2P graph database")
   await expect(alice.page.locator(".subtext")).toContainText("0 points by alice")
   await authority.page.goto(url(room, "#/"))
