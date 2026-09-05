@@ -248,7 +248,7 @@ const constitutionPage = (d) => {
 <p>A rule's <code>karma</code> is written on the user node by the authority, counted from the signed votes with the thresholds below. This browser counts it too; the user page shows both numbers, and if they differ the authority is behind or lying.</p>
 <h2>Thresholds — derived by every peer from the same signed nodes</h2><table>${rows(CONSTITUTION.thresholds, CONSTITUTION.thresholdText)}</table>
 <h2>Trust</h2><p>Writing is free; influence is earned. A vote or a flag counts only if its owner is trusted, and trust is a chain of vouches that starts at the authority. Today ${d.trusted.size === 1 ? "only the authority is trusted" : `${d.trusted.size} members are trusted`}.</p>
-<h2>Amendment</h2><p>${esc(CONSTITUTION.amendment)} <a href="https://github.com/estebanrfp/dnews/blob/main/constitution.js">The file.</a></p>
+<h2>Amendment</h2><p>${esc(CONSTITUTION.amendment)} <a href="https://github.com/estebanrfp/dNews/blob/main/constitution.js">The file.</a></p>
 ${mine}</div>`
 }
 
