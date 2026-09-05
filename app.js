@@ -90,18 +90,20 @@ const derive = () => {
       if (trusted.has(from) && !trusted.has(to)) { trusted.add(to); vouchedBy.set(to, from); grew = true }
     }
   }
-  const countVote = (voter, dir) => trusted.has(voter) && (dir > 0 || (upKarma.get(voter) ?? 0) >= T.downvoteKarma)
+  // Your own vote never counts, as on HN: neither for the points nor for the karma.
+  const countVote = (voter, dir, owner) => voter !== owner && trusted.has(voter) && (dir > 0 || (upKarma.get(voter) ?? 0) >= T.downvoteKarma)
   for (const [item, m] of votes) {
     const owner = ownerOf(item); if (!owner) continue
-    for (const [voter, n] of m) if (n.value.dir > 0 && trusted.has(voter)) upKarma.set(owner, (upKarma.get(owner) ?? 0) + 1)
+    for (const [voter, n] of m) if (n.value.dir > 0 && voter !== owner && trusted.has(voter)) upKarma.set(owner, (upKarma.get(owner) ?? 0) + 1)
   }
   // Pass 2: the numbers everyone sees.
   const points = new Map(), karma = new Map()
   for (const [item, m] of votes) {
     let p = 0
-    for (const [voter, n] of m) if (countVote(voter, n.value.dir)) p += n.value.dir
+    const owner = ownerOf(item)
+    for (const [voter, n] of m) if (countVote(voter, n.value.dir, owner)) p += n.value.dir
     points.set(item, p)
-    const owner = ownerOf(item); if (owner) karma.set(owner, (karma.get(owner) ?? 0) + p)
+    if (owner) karma.set(owner, (karma.get(owner) ?? 0) + p)
   }
   for (const [addr, voucher] of vouchedBy) if (roleOf(addr) === "restricted") karma.set(voucher, (karma.get(voucher) ?? 0) - T.vouchPenalty)
   const countingFlags = (item) => [...(flags.get(item) ?? [])].filter(([f, n]) => n.value.on && trusted.has(f) && (upKarma.get(f) ?? 0) >= T.flagKarma)
@@ -142,7 +144,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`
 // ── Views: HN's tables, to the pixel that matters ───────────────────────────
 const voteCell = (n, d, dead) => {
   const mine = d.myVote(n.id)?.value.dir ?? 0
-  if (dead) return `<td class="votelinks nosee"><div class="votearrow"></div></td>`
+  if (dead || eqAddr(n.value.owner, me)) return `<td class="votelinks nosee"><div class="votearrow"></div></td>` // no arrow on your own, as on HN
   return `<td class="votelinks"><a href="#" class="vote" data-item="${n.id}" data-dir="1" title="upvote"><div class="votearrow${mine > 0 ? " voted" : ""}"></div></a></td>`
 }
 const storyRow = (n, i, d) => {
@@ -404,7 +406,8 @@ document.addEventListener("click", async (e) => {
   if (a.id === "generate-btn") { e.preventDefault(); if (!await db.sm.startNewUserRegistration()) say("login-status", "Could not generate an identity."); return }
   if (a.id === "login-btn") {
     e.preventDefault(); const m = $("mnemonic").value.trim(); if (!m) return say("login-status", "Paste a mnemonic phrase first.")
-    try { await db.sm.loginOrRecoverUserWithMnemonic(m) } catch { say("login-status", "That mnemonic is not valid.") } return
+    try { if (!await db.sm.loginOrRecoverUserWithMnemonic(m)) say("login-status", "That mnemonic is not valid.") } // null, not a throw, as dProp checks it
+    catch { say("login-status", "That mnemonic is not valid.") } return
   }
   if (a.id === "passkey-protect-btn") { e.preventDefault(); try { if (!await db.sm.protectCurrentIdentityWithWebAuthn()) say("login-status", "Passkey registration cancelled.") } catch { say("login-status", "Could not register the passkey.") } return }
   if (a.id === "passkey-login-btn") { e.preventDefault(); try { if (!await db.sm.loginCurrentUserWithWebAuthn()) say("login-status", "Passkey login cancelled.") } catch { say("login-status", "Could not sign in with the passkey.") } return }
