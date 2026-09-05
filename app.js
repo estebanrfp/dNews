@@ -41,6 +41,8 @@ const db = await boot("open the graph on this device", () => gdb(ROOM, {
   sm: { superAdmins: [CONSTITUTION.authority], customRoles: CONSTITUTION.roles, governanceRules, acls: true },
 }))
 
+globalThis.db = db // console handle, as in the official examples
+
 // ── The store: one subscription, every kind of node ─────────────────────────
 // The four actions land here and nowhere else; every view derives from it.
 // The subscription itself is made at the end of the file: a device that
@@ -280,12 +282,13 @@ const front = (day, d) => { // HN's "past": the day's stories, ranked by points,
   return nav + (list.length ? `<table>${list.map((n, i) => storyRow(n, i + 1, d)).join("")}</table>` : `<table><tr><td class="title">No stories that day.</td></tr></table>`)
 }
 const collapsedSet = () => new Set(JSON.parse(sessionStorage.dnewsCollapsed ?? "[]"))
-let renderQueued = false, dirtyWhileTyping = false
+let renderQueued = false, dirtyWhileTyping = false, subscribed = false
 const scheduleRender = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render() }) }
 const typing = () => document.hasFocus() && $("bigbox").contains(document.activeElement) &&
   document.activeElement.matches("textarea, input:not([type=submit]):not([type=button])")
 
 const render = async () => {
+  if (!subscribed) return // the loading line stays until the store holds what this device already knew
   if (typing()) { dirtyWhileTyping = true; return } // never repaint under the reader's caret
   const d = derive(), r = route()
   const hidden = hiddenSet()
@@ -332,13 +335,24 @@ const renderSession = (d) => {
 
 // ── Writes: every one a node you own ────────────────────────────────────────
 const say = (id, text) => { const el = $(id); if (el) el.textContent = text }
-const create = (value) => db.sm.acls.set({ ...value, at: Date.now() }, crypto.randomUUID())
+// No id: with `owner` on the value the engine names the node `${owner}:${uuid}`,
+// an owned id every peer enforces — the documented pattern.
+const create = async (value) => {
+  await db.sm.executeWithPermission("write") // the engine's own verdict, before the write
+  return db.sm.acls.set({ ...value, at: Date.now() })
+}
+// A permission, read from the constitution's own role table (inheritance
+// included) — the same table the engine enforces.
+const can = (role, permission) => !!CONSTITUTION.roles[role] &&
+  (CONSTITUTION.roles[role].can.includes(permission) || (CONSTITUTION.roles[role].inherits ?? []).some((r) => can(r, permission)))
 const gate = (d) => { // what the engine would refuse, said before the click
   if (!me) { location.hash = "#/login"; return false }
   const role = d.roleOf(me)
-  if (role === "guest") return alertLine("You became a guest a moment ago; the constitution makes you a user 10 seconds after signing in."), false
-  if (role === "restricted") return alertLine("Your karma fell to −10 and the constitution restricted you to reading. It comes back with the karma."), false
-  return true
+  if (can(role, "write")) return true
+  alertLine(role === "restricted"
+    ? "Your karma fell to −10 and the constitution restricted you to reading. It comes back with the karma."
+    : "You became a guest a moment ago; the constitution makes you a user 10 seconds after signing in.")
+  return false
 }
 let alertTimer
 const alertLine = (text) => { // HN has no toasts: one quiet line above the content, outside what re-renders
@@ -466,6 +480,7 @@ await db.map({ query: { $or: [{ type: { $in: ["story", "comment", "vote", "flag"
     else nodes.set(id, { id, value, timestamp })
     scheduleRender()
   })
+subscribed = true // the initial nodes are in: from here on every render is complete
 
 // ── Presence, in the footer, as on every GenosDB page ───────────────────────
 const presence = () => { const n = Object.keys(db.room?.getPeers() ?? {}).length; $("presence").textContent = `${n} peer${n === 1 ? "" : "s"}` }

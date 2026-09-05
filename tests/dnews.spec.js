@@ -165,12 +165,21 @@ test("a device that comes back finds its graph on disk and renders before any pe
   await page.goto(`http://localhost:5705${url(room)}`)
   await expect(page.locator("#bigbox")).toContainText("Nothing here yet")
   await loginAs(page, room, "constitution")
+  const graphSize = () => page.evaluate(async (room) => {
+    try { const root = await navigator.storage.getDirectory(); return (await (await root.getFileHandle(`${room}_graph.msgpack`)).getFile()).size } catch { return -1 }
+  }, room)
+  await expect.poll(graphSize, { timeout: 30_000 }).toBeGreaterThan(0) // the login's user node is on disk
+  const before = await graphSize()
   await page.goto(`http://localhost:5705${url(room, "#/submit")}`)
   await page.locator('[name="title"]').fill("Written on this device, read back from its disk")
   await page.locator('[name="text"]').fill("No peer was ever online.")
   await page.locator('#submit-form input[type="submit"]').click()
+  // The engine writes the graph to OPFS on a short debounce, as
+  // `<room>_graph.msgpack`: read the file's size before and after the story,
+  // and close only once it has grown — the disk, not a timer, says it landed.
   await expect(page).toHaveURL(/#\/item\//)
   await expect(page.locator(".titleline")).toContainText("Written on this device")
+  await expect.poll(graphSize, { timeout: 30_000 }).toBeGreaterThan(before)
   await context.close()
 
   context = await chromium.launchPersistentContext(device)
