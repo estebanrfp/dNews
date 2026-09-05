@@ -34,7 +34,7 @@ td { font: 10pt var(--font); color: var(--grey); }
 /* y18.svg is an 18px square with a 1px white border outside it: 20px in
    all, which is what makes the bar 24px tall. */
 .logo a { display: block; width: 18px; height: 18px; border: 1px solid #ffffff; box-sizing: content-box;
-          font: bold 14px/18px var(--font); color: #ffffff; text-align: center; }
+          font: 14px/18px var(--font); color: #ffffff; text-align: center; } /* y18's Y is a regular stroke, not bold */
 .pagetop { font: 10pt/12px var(--font); color: #222222; }
 .pagetop a:link, .pagetop a:visited { color: #000000; }
 .pagetop b { margin-left: 1px; margin-right: 5px; }
