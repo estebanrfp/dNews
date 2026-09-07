@@ -38,7 +38,7 @@ Anyone can post the moment the constitution makes them a user. But a vote or a f
 - **Roles and governance.** Custom roles, a role ladder assigned by rules whose conditions are ordinary GenosDB queries, evaluated with last-match-wins so demotion needs no special machinery.
 - **Deterministic agreement.** Two peers writing at once converge on the same result everywhere: the engine's hybrid clock and its tie-break decide, and the app derives from what won.
 - **Derived state from one subscription.** One `db.map` feeds a store; every page — ranking, threads, karma, trust — is a pure function of it. Nothing ticks over the wire.
-- **Identity with no server.** Mnemonic recovery, passkey sessions that survive a reload, and demo identities so two windows can meet in one click.
+- **Identity with no server.** Mnemonic recovery, passkey sessions that survive a reload, and demo identities so two windows can meet in one click. Your own user page is the identity view: what opened the session, and **protect with passkey** while the phrase still holds the key — so a phrase or demo login is not a dead end for passkeys, and a sign-in lands there.
 
 ## Run it
 
@@ -59,10 +59,10 @@ pnpm install
 pnpm test
 ```
 
-Playwright, one `BrowserContext` per simulated visitor (own storage, own identity), a fresh room per test, real WebRTC between them. Twenty-three tests in five files:
+Playwright, one `BrowserContext` per simulated visitor (own storage, own identity), a fresh room per test, real WebRTC between them. Twenty-four tests in five files:
 
 - `tests/pages.spec.js` — every page of the bar with its own content, `past` by day, search, `More`, `hide`, folding a thread, a phone viewport, the shell when the CDN is unreachable.
-- `tests/identity.spec.js` — generate, sign in, sign out, recover with the phrase; a wrong phrase; a passkey that keeps the session across a reload (on Playwright's virtual authenticator); a profile.
+- `tests/identity.spec.js` — generate, sign in, sign out, recover with the phrase; a wrong phrase; a passkey that keeps the session across a reload (on Playwright's virtual authenticator); a phrase session that takes a passkey later, from the user page, and is resumed and reopened with it; a profile.
 - `tests/constitution.spec.js` — the rules as the engine applies them: a guest's write refused by every receiver, another's node that nobody can edit (the authority included), a vote that weighs nothing until someone vouches, your own vote that never counts, three trusted flags that kill an item and `showdead` that reveals it, the ladder that restricts at −10 karma and restores. Every negative is proved against a later write that does land, never against silence.
 - `tests/sync.spec.js` — a story and a thread crossing between visitors with the ICE candidate pairs to prove the transport, and a device that comes back to its graph on disk with no peer online.
 - `tests/thresholds.spec.js` — the thresholds reached by real votes: five downvotes that kill an item on their own (`deadScore`), a voucher that pays for an invitee who ends up restricted (`vouchPenalty`), and a downvote below `downvoteKarma` that is neither offered nor counted.

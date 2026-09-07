@@ -236,7 +236,7 @@ const userPage = (addr, d) => {
   const invitees = [...d.vouchedBy].filter(([, v]) => v === addr.toLowerCase()).map(([a]) => a)
   const rows = [
     ["user:", `<span class="hnuser">${esc(nameOf(addr, d))}</span>`],
-    ["address:", `<span class="mono">${esc(addr)}</span>`],
+    ["address:", `<span class="mono">${esc(addr)}</span>${isMe ? ` <a href="#" id="copy-address"><u>copy</u></a>` : ""}`],
     ["created:", since ? new Date(since).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "—"],
     ["karma:", `${k}${certified !== undefined ? ` <span class="label${certified !== k ? " mismatch" : ""}">— counted here from the signed votes; the authority certified ${certified}${certified !== k ? ", which differs" : ""}</span>` : ""}`],
     ["role:", `${esc(role)}${role === "restricted" ? " — lost the right to write; it comes back with the karma" : ""}`],
@@ -244,10 +244,19 @@ const userPage = (addr, d) => {
     ...(invitees.length ? [["vouched:", invitees.map((a) => userLink(a, d)).join(", ")]] : []),
     ["about:", u?.about ? richText(u.about) : ""],
   ]
+  // Your own page is the identity view (design guide §4.2): what opened the session,
+  // and the passkey offer while the phrase still holds the key — the login page
+  // offers it only during onboarding, and a phrase login would otherwise never see it.
+  const s = session, canProtect = isMe && PASSKEYS_AVAILABLE && !s.isWebAuthnProtected && s.hasVolatileIdentity
+  const identity = isMe ? [
+    ["session:", s.isWebAuthnProtected ? "opened by the passkey on this browser; it survives a reload" : "opened with the phrase; it ends with this page"],
+    ["passkey:", s.isWebAuthnProtected ? "protects this identity" : canProtect ? `<button id="passkey-protect-btn">protect with passkey</button> <span class="note">— the session then survives reloads and the phrase is never typed again on this browser</span>` : PASSKEYS_AVAILABLE ? "none for this identity" : "needs HTTPS or localhost"],
+    ["", `<span class="note status" id="login-status"></span>`],
+  ] : []
   const vouch = me && !isMe && !trusted && d.canVouch(me) ? `<tr><td></td><td><a href="#" id="vouch-btn" data-address="${esc(addr)}"><u>vouch for ${esc(nameOf(addr, d))}</u></a> <span class="note">— a signed node; if they end up restricted it costs you ${T.vouchPenalty} karma</span></td></tr>` : ""
   const edit = isMe ? `<tr><td colspan="2"><form id="profile-form" class="formtable"><table class="formtable"><tr><td>name:</td><td><input type="text" name="name" maxlength="15" pattern="[a-z0-9_-]{1,15}" value="${esc(u?.name ?? "")}" placeholder="lowercase, digits, - and _"></td></tr><tr><td>about:</td><td><textarea name="about">${esc(u?.about ?? "")}</textarea></td></tr><tr><td>showdead:</td><td><label><input type="checkbox" id="showdead"${showDead() ? " checked" : ""}> show killed items, in grey, with the reason</label></td></tr>
 <tr><td></td><td><input type="submit" value="update"> <span class="note" id="profile-status"></span></td></tr></table></form></td></tr>` : ""
-  return `<table class="userpage">${rows.map(([l, v]) => `<tr><td>${l}</td><td>${v}</td></tr>`).join("")}${vouch}
+  return `<table class="userpage">${[...rows, ...identity].map(([l, v]) => `<tr><td>${l}</td><td>${v}</td></tr>`).join("")}${vouch}
 <tr><td></td><td><a href="#/submitted/${esc(addr)}"><u>submissions</u></a></td></tr><tr><td></td><td><a href="#/threads/${esc(addr)}"><u>comments</u></a></td></tr>${edit}</table>`
 }
 
@@ -395,6 +404,7 @@ document.addEventListener("click", async (e) => {
     box.innerHTML = box.innerHTML ? "" : commentForm(a.dataset.item, nodes.get(a.dataset.item)?.value.story); box.querySelector("textarea")?.focus(); return
   }
   if (a.id === "logout") { e.preventDefault(); return db.sm.clearSecurity() }
+  if (a.id === "copy-address") { e.preventDefault(); try { await navigator.clipboard.writeText(me); say("login-status", "address copied") } catch { say("login-status", "clipboard unavailable — select the address and copy it") } return }
   if (a.id === "vouch-btn") {
     e.preventDefault(); if (!gate(d)) return
     await create({ type: "vouch", for: a.dataset.address }); return alertLine(`You vouched for ${nameOf(a.dataset.address, d)}. The chain is public.`)
@@ -475,7 +485,7 @@ let certifying = null, seeded = false
 db.sm.setSecurityStateChangeCallback((state) => {
   session = state
   me = state.isActive ? state.activeAddress : null
-  if (state.isActive && route().page === "login") location.hash = sessionStorage.dnewsGoto ?? "#/"
+  if (state.isActive && route().page === "login") location.hash = `#/user/${me}` // a sign-in lands on your identity view: the profile, and the passkey offer while the phrase still holds the key
   if (eqAddr(me, AUTHORITY)) startAuthority(); else stopAuthority()
   render()
 })

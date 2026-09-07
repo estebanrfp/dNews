@@ -62,6 +62,31 @@ test("a passkey keeps the session across a reload; a phrase session does not", a
   await v.close(); await w.close()
 })
 
+test("a phrase session takes a passkey later, from the user page — the identity view behind the session pill", async ({ browser }) => {
+  const v = await visitor(browser, freshRoom("later-passkey"))
+  const cdp = await v.context.newCDPSession(v.page)
+  await cdp.send("WebAuthn.enable")
+  await cdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true } })
+  await loginAs(v, "alice")
+  await expect(v.page).toHaveURL(new RegExp(`#/user/${v.address}$`)) // a sign-in lands on your own page
+  const page = v.page.locator(".userpage")
+  await expect(page).toContainText(/session:\s*opened with the phrase/)
+  await expect(page.locator("#passkey-protect-btn")).toBeVisible() // offered after a phrase login, not only at onboarding
+  await page.locator("#passkey-protect-btn").click()
+  await expect(page).toContainText(/session:\s*opened by the passkey/)
+  await expect(page.locator("#passkey-protect-btn")).toHaveCount(0)
+  await v.page.reload()
+  await expect(v.page.locator("#session .hnuser")).toHaveAttribute("title", v.address) // resumed silently, no phrase typed
+  await v.page.locator("#session .hnuser").click()
+  await expect(v.page.locator(".userpage")).toContainText(/passkey:\s*protects this identity/)
+  await v.page.locator("#logout").click()
+  await expect(v.page.locator("#session")).toHaveText("login")
+  await go(v, "#/login")
+  await v.page.locator("#passkey-login-btn").click()
+  await expect(v.page.locator("#session .hnuser")).toHaveAttribute("title", v.address)
+  await v.close()
+})
+
 test("a profile: the name and the about travel, and the name replaces the address everywhere", async ({ browser }) => {
   const room = freshRoom("profile")
   const authority = await visitor(browser, room), alice = await visitor(browser, room)
